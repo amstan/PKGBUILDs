@@ -1,36 +1,25 @@
 # ARMv7 multi-platform
-# Maintainer: Kevin Mihelich <kevin@archlinuxarm.org>
+# Original author: Kevin Mihelich <kevin@archlinuxarm.org>
+# Maintainer: Alexandru M Stan <amstan@chromium.org>
 
 buildarch=4
 
-pkgbase=linux-armv7
-_srcname=linux-4.20
+pkgbase=linux-enclustra
 _kernelname=${pkgbase#linux}
-_desc="ARMv7 multi-platform"
-pkgver=4.20.13
+_desc="ARMv7 enclustra"
+pkgver=4.20.0
 pkgrel=1
+_commit=f6ad27af07105a7d5e27cfe32cf6c1ce0a1bdf19
+_srcname=altera-linux-${_commit}
 rcnrel=armv7-x9
 arch=('armv7h')
 url="http://www.kernel.org/"
 license=('GPL2')
-makedepends=('xmlto' 'docbook-xsl' 'kmod' 'inetutils' 'bc' 'git' 'uboot-tools' 'vboot-utils' 'dtc')
+makedepends=('xmlto' 'docbook-xsl' 'kmod' 'inetutils' 'bc' 'git' 'uboot-tools' 'dtc')
 options=('!strip')
-source=("http://www.kernel.org/pub/linux/kernel/v4.x/${_srcname}.tar.xz"
-        "http://www.kernel.org/pub/linux/kernel/v4.x/patch-${pkgver}.xz"
-        "http://rcn-ee.com/deb/sid-armhf/v${pkgver}-${rcnrel}/patch-${pkgver%.0}-${rcnrel}.diff.gz"
-        '0001-ARM-atags-add-support-for-Marvell-s-u-boot.patch'
-        '0002-ARM-atags-fdt-retrieve-MAC-addresses-from-Marvell-bo.patch'
-        '0003-SMILE-Plug-device-tree-file.patch'
-        '0004-fix-mvsdio-eMMC-timing.patch'
-        '0005-net-smsc95xx-Allow-mac-address-to-be-set-as-a-parame.patch'
-        '0006-set-default-cubietruck-led-triggers.patch'
-        '0007-exynos4412-odroid-set-higher-minimum-buck2-regulator.patch'
-        '0008-ARM-dove-enable-ethernet-on-D3Plug.patch'
-        '0009-media-s5p-mfc-fix-incorrect-bus-assignment-in-virtua.patch'
+source=("https://github.com/enclustra-bsp/altera-linux/archive/${_commit}.tar.gz"
+        '0001-scripts-dtc-Remove-redundant-YYLOC-global-declaratio.patch'
         'config'
-        'kernel.its'
-        'kernel.keyblock'
-        'kernel_data_key.vbprivk'
         'linux.preset'
         '60-linux.hook'
         '90-linux.hook')
@@ -57,22 +46,8 @@ md5sums=('d39dd4ba2d5861c54b90d49be19eaf31'
 prepare() {
   cd "${srcdir}/${_srcname}"
 
-  # add upstream patch
-  git apply --whitespace=nowarn ../patch-${pkgver}
-
-  # RCN patch
-  git apply ../patch-${pkgver%.0}-${rcnrel}.diff
-
-  # ALARM patches
-  git apply ../0001-ARM-atags-add-support-for-Marvell-s-u-boot.patch
-  git apply ../0002-ARM-atags-fdt-retrieve-MAC-addresses-from-Marvell-bo.patch
-  git apply ../0003-SMILE-Plug-device-tree-file.patch
-  git apply ../0004-fix-mvsdio-eMMC-timing.patch
-  git apply ../0005-net-smsc95xx-Allow-mac-address-to-be-set-as-a-parame.patch
-  git apply ../0006-set-default-cubietruck-led-triggers.patch
-  git apply ../0007-exynos4412-odroid-set-higher-minimum-buck2-regulator.patch
-  git apply ../0008-ARM-dove-enable-ethernet-on-D3Plug.patch
-  git apply ../0009-media-s5p-mfc-fix-incorrect-bus-assignment-in-virtua.patch
+  # patches
+  git apply ../0001-scripts-dtc-Remove-redundant-YYLOC-global-declaratio.patch
 
   cat "${srcdir}/config" > ./.config
 
@@ -110,7 +85,7 @@ build() {
   #yes "" | make config
 
   # build!
-  make ${MAKEFLAGS} zImage modules dtbs
+  make LOADADDR=0x8000 ${MAKEFLAGS} uImage modules dtbs
 }
 
 _package() {
@@ -233,26 +208,26 @@ _package-headers() {
   # add dvb headers for external modules
   # in reference to:
   # http://bugs.archlinux.org/task/11194
-  mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/include/config/dvb/"
-  cp include/config/dvb/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/include/config/dvb/"
-
-  # add dvb headers for http://mcentral.de/hg/~mrec/em28xx-new
-  # in reference to:
-  # http://bugs.archlinux.org/task/13146
-  mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends/"
-  cp drivers/media/dvb-frontends/lgdt330x.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends/"
-  mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/i2c/"
-  cp drivers/media/i2c/msp3400-driver.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/i2c/"
-
-  # add dvb headers
-  # in reference to:
-  # http://bugs.archlinux.org/task/20402
-  mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/usb/dvb-usb"
-  cp drivers/media/usb/dvb-usb/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/usb/dvb-usb/"
-  mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends"
-  cp drivers/media/dvb-frontends/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends/"
-  mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/tuners"
-  cp drivers/media/tuners/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/tuners/"
+#   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/include/config/dvb/"
+#   cp include/config/dvb/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/include/config/dvb/"
+#
+#   # add dvb headers for http://mcentral.de/hg/~mrec/em28xx-new
+#   # in reference to:
+#   # http://bugs.archlinux.org/task/13146
+#   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends/"
+#   cp drivers/media/dvb-frontends/lgdt330x.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends/"
+#   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/i2c/"
+#   cp drivers/media/i2c/msp3400-driver.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/i2c/"
+#
+#   # add dvb headers
+#   # in reference to:
+#   # http://bugs.archlinux.org/task/20402
+#   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/usb/dvb-usb"
+#   cp drivers/media/usb/dvb-usb/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/usb/dvb-usb/"
+#   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends"
+#   cp drivers/media/dvb-frontends/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/dvb-frontends/"
+#   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/tuners"
+#   cp drivers/media/tuners/*.h "${pkgdir}/usr/lib/modules/${_kernver}/build/drivers/media/tuners/"
 
   # add xfs and shmem for aufs building
   mkdir -p "${pkgdir}/usr/lib/modules/${_kernver}/build/fs/xfs"
@@ -283,115 +258,22 @@ _package-headers() {
   rm -rf "${pkgdir}"/usr/lib/modules/${_kernver}/build/arch/{alpha,arc,arm26,arm64,avr32,blackfin,c6x,cris,frv,h8300,hexagon,ia64,m32r,m68k,m68knommu,metag,mips,microblaze,mn10300,openrisc,parisc,powerpc,ppc,s390,score,sh,sh64,sparc,sparc64,tile,unicore32,um,v850,x86,xtensa}
 }
 
-_package-smileplug() {
-  pkgdesc="The Linux Kernel - ${_desc} - Marvell SMILE Plug"
-  depends=('linux-armv7')
-  provides=('linux-armv7-uimage')
-  conflicts=('linux-armv7-uimage' 'linux-armv7-rc-uimage')
-  replaces=('linux-mvebu-smileplug')
+_package-mercury_aa1() {
+  pkgdesc="The Linux Kernel - ${_desc} - Enclustra"
+  depends=('linux-enclustra')
+  provides=('linux-enclustra-uimage')
+  conflicts=('linux-enclustra-uimage' 'linux-enclustra-rc-uimage')
 
   cd "${srcdir}/${_srcname}"
 
   mkdir -p "${pkgdir}/boot"
-  cat arch/$KARCH/boot/zImage arch/$KARCH/boot/dts/armada-370-smileplug.dtb > myimage
-  mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n "${pkgname}" -d myimage "${pkgdir}/boot/uImage"
+#   cat arch/$KARCH/boot/zImage arch/$KARCH/boot/dts/socfpga_arria10_mercury_aa1.dtb > myimage
+  cp arch/$KARCH/boot/dts/socfpga_arria10_mercury_aa1.dtb "${pkgdir}/boot/devicetree.dtb"
+  cp arch/$KARCH/boot/uImage "${pkgdir}/boot/uImage"
+#   mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n "${pkgname}" -d myimage "${pkgdir}/boot/uImage"
 }
 
-_package-mirabox() {
-  pkgdesc="The Linux Kernel - ${_desc} - Globalscale Mirabox"
-  depends=('linux-armv7')
-  provides=('linux-armv7-uimage')
-  conflicts=('linux-armv7-uimage' 'linux-armv7-rc-uimage')
-  replaces=('linux-mvebu-mirabox')
-
-  cd "${srcdir}/${_srcname}"
-
-  mkdir -p "${pkgdir}/boot"
-  cat arch/$KARCH/boot/zImage arch/$KARCH/boot/dts/armada-370-mirabox.dtb > myimage
-  mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n "${pkgname}" -d myimage "${pkgdir}/boot/uImage"
-}
-
-_package-ax3() {
-  pkgdesc="The Linux Kernel - ${_desc} - OpenBlocks AX3-4"
-  depends=('linux-armv7')
-  provides=('linux-armv7-uimage')
-  conflicts=('linux-armv7-uimage' 'linux-armv7-rc-uimage')
-  replaces=('linux-mvebu-ax3')
-
-  cd "${srcdir}/${_srcname}"
-
-  mkdir -p "${pkgdir}/boot"
-  cat arch/$KARCH/boot/zImage arch/$KARCH/boot/dts/armada-xp-openblocks-ax3-4.dtb > myimage
-  mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n "${pkgname}" -d myimage "${pkgdir}/boot/uImage"
-}
-
-_package-d3plug() {
-  pkgdesc="The Linux Kernel - ${_desc} - Globalscale D3Plug"
-  depends=('linux-armv7')
-  provides=('linux-armv7-uimage')
-  conflicts=('linux-armv7-uimage' 'linux-armv7-rc-uimage')
-  replaces=('linux-d3plug')
-
-  cd "${srcdir}/${_srcname}"
-
-  mkdir -p "${pkgdir}/boot"
-  cat arch/$KARCH/boot/zImage arch/$KARCH/boot/dts/dove-d3plug.dtb > myimage
-  mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n "${pkgname}" -d myimage "${pkgdir}/boot/uImage"
-}
-
-_package-cubox() {
-  pkgdesc="The Linux Kernel - ${_desc} - SolidRun Cubox (Marvell)"
-  depends=('linux-armv7')
-  provides=('linux-armv7-uimage')
-  conflicts=('linux-armv7-uimage' 'linux-armv7-rc-uimage')
-  #replaces=('linux-cubox')
-
-  cd "${srcdir}/${_srcname}"
-
-  mkdir -p "${pkgdir}/boot"
-  cat arch/$KARCH/boot/zImage arch/$KARCH/boot/dts/dove-cubox.dtb > myimage
-  mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000 -n "${pkgname}" -d myimage "${pkgdir}/boot/uImage"
-}
-
-_package-chromebook() {
-  pkgdesc="The Linux Kernel - ${_desc} - Chromebooks"
-  depends=('linux-armv7')
-  conflicts=('linux-armv7-rc-chromebook')
-  install=${pkgname}.install
-
-  cd "${srcdir}/${_srcname}"
-
-  cp ../kernel.its .
-  mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
-  dd if=/dev/zero of=bootloader.bin bs=512 count=1
-  echo 'console=tty0 init=/sbin/init root=PARTUUID=%U/PARTNROFF=1 rootwait rw noinitrd' > cmdline
-  vbutil_kernel \
-    --pack vmlinux.kpart \
-    --version 1 \
-    --vmlinuz vmlinux.uimg \
-    --arch arm \
-    --keyblock ../kernel.keyblock \
-    --signprivate ../kernel_data_key.vbprivk \
-    --config cmdline \
-    --bootloader bootloader.bin
-
-  mkdir -p "${pkgdir}/boot"
-  cp vmlinux.kpart "${pkgdir}/boot"
-}
-
-_package-odroidc1() {
-  pkgdesc="The Linux Kernel - ${_desc} - ODROID-C1"
-  depends=('linux-armv7')
-  provides=('linux-armv7-uimage')
-  conflicts=('linux-armv7-uimage' 'linux-armv7-rc-uimage')
-
-  cd "${srcdir}/${_srcname}"
-
-  mkdir -p "${pkgdir}/boot"
-  mkimage -A arm -O linux -T kernel -C none -a 0x00208000 -e 0x00208000 -n "${pkgname}" -d arch/$KARCH/boot/zImage "${pkgdir}/boot/uImage"
-}
-
-pkgname=("${pkgbase}" "${pkgbase}-headers" "${pkgbase}-smileplug" "${pkgbase}-mirabox" "${pkgbase}-ax3" "${pkgbase}-d3plug" "${pkgbase}-cubox" "${pkgbase}-chromebook" "${pkgbase}-odroidc1")
+pkgname=("${pkgbase}" "${pkgbase}-headers" "${pkgbase}-mercury_aa1")
 for _p in ${pkgname[@]}; do
   eval "package_${_p}() {
     _package${_p#${pkgbase}}
