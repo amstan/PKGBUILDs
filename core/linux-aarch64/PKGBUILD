@@ -235,6 +235,8 @@ _package-chromebook() {
   ../generate_chromebook_its.sh ${srcdir} > kernel.its << DT_END
     rk3399-gru-bob
     rk3399-gru-kevin
+    rk3399-gru-scarlet-inx
+    rk3399-gru-scarlet-kd
 DT_END
 
   mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
