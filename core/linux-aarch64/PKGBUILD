@@ -21,7 +21,7 @@ source=("http://www.kernel.org/pub/linux/kernel/v5.x/${_srcname}.tar.xz"
         '0003-arm64-dts-rockchip-add-usb3-controller-node-for-RK33.patch'
         '0004-arm64-dts-rockchip-enable-usb3-nodes-on-rk3328-rock6.patch'
         'config'
-        'kernel.its'
+        'generate_chromebook_its.sh'
         'kernel.keyblock'
         'kernel_data_key.vbprivk'
         'linux.preset'
@@ -231,7 +231,11 @@ _package-chromebook() {
   cd ${_srcname}
 
   mkdir -p "${pkgdir}/boot"
-  cp ../kernel.its .
+
+  ../generate_chromebook_its.sh ${srcdir} > kernel.its << DT_END
+    rk3399-gru-bob
+    rk3399-gru-kevin
+DT_END
 
   mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
   dd if=/dev/zero of=bootloader.bin bs=512 count=1
