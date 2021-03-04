@@ -237,11 +237,19 @@ _package-chromebook() {
     rk3399-gru-kevin
     rk3399-gru-scarlet-inx
     rk3399-gru-scarlet-kd
+
+    sc7180-trogdor-lazor-r0
+    sc7180-trogdor-lazor-r1
+    sc7180-trogdor-lazor-r1-kb
+    sc7180-trogdor-lazor-r1-lte
+    sc7180-trogdor-lazor-r3
+    sc7180-trogdor-lazor-r3-kb
+    sc7180-trogdor-lazor-r3-lte
 DT_END
 
   mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
   dd if=/dev/zero of=bootloader.bin bs=512 count=1
-  echo "console=tty0 console=ttyS2,115200n8 earlyprintk=ttyS2,115200n8 init=/sbin/init root=PARTUUID=%U/PARTNROFF=1 rootwait rw noinitrd" > cmdline
+  echo "console=tty0 console=ttyS2,115200n8 console=ttyMSM0,115200n8 earlyprintk=ttyMSM0,115200n8 init=/sbin/init root=PARTUUID=%U/PARTNROFF=1 rootwait rw noinitrd" > cmdline
   vbutil_kernel \
     --pack vmlinux.kpart \
     --version 1 \
