@@ -1,0 +1,21 @@
+# Chromium OS 4.4 kernel for ARM Chromebooks
+# Maintainer: Alexandru M Stan <alex@hypertriangle.com>
+
+_chromeos_kernel_version=4.4
+_chromeos_boards=(
+	'gru'
+)
+
+# Manually specify Chrome OS kernel release (for reproducibility)
+# Comment these out if you want it to figure out automatically via the last
+# git ls-remote https://chromium.googlesource.com/chromiumos/third_party/kernel "refs/heads/release-R*"
+# _chromeos_release="release-R90-13816.B-" # needs a dash at the end
+# _chromeos_hash=0ab426c509b1
+
+# Uncomment if you want to use top of tree (newer than canary branch)
+# _chromeos_release=""
+
+# The following will be overwritten by makepkg due to pkgver(), changing here is futile
+pkgver=R90.13816.B.19934.g9ec36bd1008a
+
+source "${BASH_SOURCE%/*}/PKGBUILD.common"

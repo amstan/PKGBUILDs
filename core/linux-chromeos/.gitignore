@@ -1,0 +1,4 @@
+kernel-seed/
+pkg/
+src/
+*.pkg*

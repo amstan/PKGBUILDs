@@ -1,0 +1,254 @@
+# Chromium OS kernels for all ARM Chromebooks
+# Maintainer: Alexandru M Stan <alex@hypertriangle.com>
+# This file is sourced by each linux-chromeos-$version/PKGBUILD
+# This folder contents are all symlinked to each such packages:
+#   for f in ../linux-chromeos/{.,}*; do ln -s $f .; done;
+
+_chromeos_release_automatic=$(
+	git ls-remote https://chromium.googlesource.com/chromiumos/manifest "refs/heads/release-R*" |
+	tail -n 1 | # 1 roughly matches beta: balance stability with new device support latency
+	head -n 1 |
+	cut -d/ -f 3
+)
+_chromeos_release=${_chromeos_release-${_chromeos_release_automatic}-}
+echo "Selected ${_chromeos_kernel_version} kernel from _chromeos_release=\"${_chromeos_release}\", forced hash=\"${_chromeos_hash}\""
+
+_chromeos_branch=${_chromeos_release}chromeos-${_chromeos_kernel_version}
+
+pkgbase=linux-chromeos-${_chromeos_kernel_version}
+pkgrel=1
+_desc='Chrome OS ${_chromeos_kernel_version}'
+arch=('aarch64')
+_git_url="https://chromium.googlesource.com/chromiumos/third_party/kernel"
+url="https://chromium.googlesource.com/chromiumos/third_party/kernel"
+license=('GPL2')
+makedepends=('xmlto' 'docbook-xsl' 'kmod' 'inetutils' 'bc' 'git' 'uboot-tools' 'vboot-utils' 'dtc')
+options=('!strip')
+_srcname=${pkgbase}
+source=('arch-5.4.aarch64.config'
+        'arch-4.4.aarch64.config'
+        'arch-4.19.aarch64.config'
+        'arch-4.19.armv7h.config'
+        'generate_chromebook_its.sh'
+        'kernel.keyblock'
+        'kernel_data_key.vbprivk'
+)
+sha256sums=('467978c259d5adc7cd8e9af2e911464c509b9047f8606c06ddb008d4002989bc'
+            '35ba2e1615deea86e49d36efc0771336d1acd85a7038d4f06cc68f9e4afd75a7'
+            '6625721915454465b80bd5d221543b1789f81541f67add207cf13208c95431a3'
+            '03aa2228338dc3a97ac9dc21c2afa8ae85eb223447678724a710df5105e736a8'
+            'e990d523a38f5c1068c4d7b15742f6d99439aacfbcf0f5abe77dbd21e30dc5c0'
+            '4e708c9ec43ac4a5d718474c9431ba6b6da3e64a9dda6afd2853a9e9e3079ffb'
+            'bc9e707a86e55a93f423e7bcdae4a25fd470b868e53829b91bbe2ccfbc6da27b')
+
+buildarch=8
+KARCH=arm64
+if [ "${_chromeos_kernel_version}" = "4.19" ]; then
+	# Veyron's last supported kernel, so add in armv7h compiling too
+	# TODO(future): delete this when the 4.19 kernel is deprecated
+	buildarch=12
+	arch+=('armv7h')
+	if [ ${CARCH} = armv7h ]; then KARCH=arm; fi
+fi
+
+pkgver() {
+	cd $_srcname
+	git describe --long | sed -E "s/^v[^-]+-//;s/([^-]*-g)/${_chromeos_release}\1/;s/release.//g;s/-/./g"
+}
+
+prepare() {
+	# The makepkg git module has a very bad interaction with the chromeos
+	# kernel repo. `git clone --mirror` is a bad idea with gerrit.
+	#
+	# Let's do this manually instead for just the branches we want, while
+	# maintaining a chromeos kernel git cache (src/linux-chromeos, a bare
+	# repo, but it could be a full one if desired) that can be shared between
+	# packages.
+	#
+	# In order to speed up creation of this cache, look for a user-provided
+	# `kernel-seed` repo in the same folder as this PKGBUILD (or provided as
+	# $KERNEL_SEED_REPO), that could be any kernel git tree, the more in common
+	# with the chromeos branches the faster stuff will update later.
+	#
+	# The working copy (where compilation happens) is another repo with a
+	# checkout that gets clobbered every time by us.
+
+	cd "${srcdir}"
+
+	seed=${KERNEL_SEED_REPO:-../kernel-seed}
+	cache=linux-chromeos
+	if [ ! -d "${cache}" ]; then
+		echo "Create the big git kernel cache:"
+		if [ -d "../kernel-seed" ]; then
+			echo "Starting with a clone of user provided kernel-seed..."
+			git clone -l ../kernel-seed --no-checkout ${cache} --bare
+			cd ${cache}
+		else
+			echo "Starting new cache repo from scratch..."
+			mkdir ${cache}
+			cd ${cache}
+			git init --bare
+		fi
+	else
+		echo "Maintain the big git kernel cache:"
+		cd ${cache}
+	fi
+
+	echo "Update only the stuff we need from ${_git_url}"
+	git remote add cros ${_git_url} 2>/dev/null ||
+		git remote set-url cros ${_git_url}
+	git fetch cros ${_chromeos_branch}
+
+	cd "${srcdir}"
+	echo "(Re-)Creating working copy in ${_srcname}"
+	rm -Rf ${_srcname}
+	git clone -s ${cache} ${_srcname} --no-checkout --origin cache
+	cd "${srcdir}/${_srcname}"
+	git remote add cros ${_git_url} 2>/dev/null ||
+		git remote set-url cros ${_git_url}
+	git fetch cros ${_chromeos_branch}
+	git checkout ${_chromeos_branch}
+	git checkout ${_chromeos_hash} # It's ok if this var is empty, it'll be a noop
+
+	# Apply any debugging/non chromeos patches
+	# TODO
+
+	echo "Setting version..."
+	scripts/setlocalversion --save-scmversion
+	# add pkgrel to extraversion
+	sed -ri "s|^(EXTRAVERSION =)(.*)|\1 \2-${pkgrel}|" Makefile
+
+	echo "Setting config..."
+	# Start from a generic arch config
+	cp ../arch-${_chromeos_kernel_version}.${CARCH}.config .config
+	# Append chromeos stuff (since it might change in newer chromeos kernel commits)
+	# TODO(future): simplify ${config_arch} logic when 4.19 is deprecated and there's no need for armel
+	config_arch=arm64
+	if [ ${CARCH} = armv7h ]; then config_arch=armel; fi
+	for f in $(echo chromeos/config/*.config chromeos/config/${config_arch}/common.config chromeos/config/${config_arch}/*flavour.config); do
+		echo "# Appending ${f}" | tee -a .config
+		cat ${f} |
+			grep -v "\#" | # don't disable things previously defined
+			# chromeos sometimes enables annoying stuff:
+			grep -v "CONFIG_SECURITY" |
+			grep -v "CONFIG_DEBUG_INFO" |
+			grep -v "CORESIGHT" |
+		cat >> .config
+	done
+
+	# don't run depmod on 'make install'. We'll do this ourselves in packaging
+	sed -i '2iexit 0' scripts/depmod.sh
+}
+
+build() {
+	cd "${srcdir}/${_srcname}"
+
+	# This is absolutely needed due to our appending
+	yes "" | make config
+
+	# get kernel version
+	make prepare
+
+	# load configuration
+	# Configure the kernel. Replace the line below with one of your choice.
+	#make menuconfig # CLI menu for configuration
+	#make nconfig # new CLI menu for configuration
+	#make xconfig # X-based configuration
+	#make oldconfig # using old config from previous kernel version
+	# ... or manually edit .config
+
+	# Copy back our configuration (use with new kernel version)
+	#cp ./.config ../${pkgbase}.config
+
+	####################
+	# stop here
+	# this is useful to configure the kernel
+	#msg "Stopping build"
+	#return 1
+	####################
+
+	# -Werror will probably bite us since we're compiling with a newer gcc than was tested
+	echo "KBUILD_CFLAGS += -Wno-error" >> Makefile
+
+	# build!
+	unset LDFLAGS
+	make ${MAKEFLAGS} Image modules
+	make ${MAKEFLAGS} DTC_FLAGS="-@" dtbs
+}
+
+_package() {
+	pkgdesc="The Linux Kernel and modules - ${_desc}"
+	depends=('coreutils' 'linux-firmware' 'kmod')
+	optdepends=('crda: to set the correct wireless channels of your country')
+	provides=('kernel26' "linux=${_chromeos_kernel_version}")
+	conflicts=('linux')
+	install=linux-chromeos.install
+
+	cd "${srcdir}/${_srcname}"
+
+	image=arch/${KARCH}/boot/Image
+
+	# get kernel version
+	_kernver="$(make kernelrelease)"
+	_basekernel=${_kernver%%-*}
+	_basekernel=${_basekernel%.*}
+
+	mkdir -p "${pkgdir}"/{lib/modules,lib/firmware,boot/dtbs}
+	make INSTALL_MOD_PATH="${pkgdir}" modules_install
+	#make INSTALL_DTBS_PATH="${pkgdir}/boot/dtbs" dtbs_install
+	chromebook_dtbs=($(for b in ${_chromeos_boards[@]}; do find arch/${KARCH}/boot -name "*${b}*.dtb" | LC_COLLATE=C sort; done))
+
+	# TODO if [ ${CARCH} = armv7h ]; disable compression and use zImage instead
+	for to_compress in ${chromebook_dtbs[@]} ${image}; do
+		#lzma -9 -z -f -k ${to_compress} # This is 40% smaller but takes ~1 sec longer to boot
+		lz4 -20 -z -f ${to_compress}
+	done
+	echo ${chromebook_dtbs[@]/%/.lz4} | ../generate_chromebook_its.sh ${image}.lz4 ${KARCH} lz4 > kernel.its
+
+	# pack the kernel the way depthcharge likes it
+	# pretend we're a chromeos kernel with developer signed keys
+	mkimage -D "-I dts -O dtb -p 2048" -f kernel.its vmlinux.uimg
+	dd if=/dev/zero of=bootloader.bin bs=512 count=1
+	echo "console=tty0 console=ttyS2,115200n8 earlyprintk=ttyS2,115200n8 console=ttyMSM0,115200n8 init=/sbin/init root=PARTUUID=%U/PARTNROFF=1 rootwait rw noinitrd" > cmdline
+	vbutil_kernel \
+		--pack vmlinux.kpart \
+		--version 1 \
+		--vmlinuz vmlinux.uimg \
+		--arch aarch64 \
+		--keyblock ../kernel.keyblock \
+		--signprivate ../kernel_data_key.vbprivk \
+		--config cmdline \
+		--bootloader bootloader.bin
+
+	cp vmlinux.kpart "${pkgdir}/boot"
+
+	# remove build and source links
+	rm -f "${pkgdir}"/lib/modules/${_kernver}/{source,build}
+	# remove the firmware
+	rm -rf "${pkgdir}/lib/firmware"
+	# make room for external modules
+	ln -s "../extramodules-${_basekernel}${_kernelname:--ARCH}" "${pkgdir}/lib/modules/${_kernver}/extramodules"
+	# add real version for building modules and running depmod from post_install/upgrade
+	mkdir -p "${pkgdir}/lib/modules/extramodules-${_basekernel}${_kernelname:--ARCH}"
+	echo "${_kernver}" > "${pkgdir}/lib/modules/extramodules-${_basekernel}${_kernelname:--ARCH}/version"
+
+	# Now we call depmod...
+	depmod -b "$pkgdir" -F System.map "$_kernver"
+
+	# move module tree /lib -> /usr/lib
+	mkdir -p "${pkgdir}/usr"
+	mv "$pkgdir/lib" "$pkgdir/usr"
+}
+
+_package-headers() {
+	pkgdesc="Header files and scripts for building modules for linux kernel - ${_desc}"
+	provides=("linux-headers=${_chromeos_kernel_version}")
+	conflicts=('linux-headers')
+}
+
+pkgname=("${pkgbase}" "${pkgbase}-headers")
+for _p in ${pkgname[@]}; do
+  eval "package_${_p}() {
+    _package${_p#${pkgbase}}
+  }"
+done

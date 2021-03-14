@@ -1,0 +1,1 @@
+../linux-chromeos/generate_chromebook_its.sh
