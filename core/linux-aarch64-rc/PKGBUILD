@@ -11,7 +11,7 @@ _srcname=linux-${_rcver}-rc${_rcrel}
 _kernelname=${pkgbase#linux}
 _desc="AArch64 multi-platform (release candidate)"
 pkgver=${_rcver}.rc${_rcrel}
-pkgrel=3
+pkgrel=4
 arch=('aarch64')
 url="http://www.kernel.org/"
 license=('GPL2')
@@ -35,7 +35,7 @@ md5sums=('dc4fe4b1427b7223386205250988f55a'
          '1553fe4abbe675ed8abd4644561d8e8c'
          '9844db3484f4d4fa3e63c7e083f656f7'
          '47c62c814000ad515ab71213c00734bf'
-         'cb97c1ab32e0165cde8fb5eb68302225'
+         '83f152a9d9c2ced9de2b55d473e7ddb2'
          '61c5ff73c136ed07a7aadbf58db3d96a'
          '584777ae88bce2c5659960151b64c7d8'
          '41cb5fef62715ead2dd109dbea8413d6'

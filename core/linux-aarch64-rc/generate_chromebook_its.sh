@@ -11,7 +11,7 @@ cat <<-ITS_HEADER_END
 / {
     description = "Chrome OS kernel image with one or more FDT blobs";
     images {
-        kernel@1{
+        kernel-archlinuxarm {
             description = "kernel";
             data = /incbin/("${image}");
             type = "kernel_noload";
@@ -21,18 +21,18 @@ cat <<-ITS_HEADER_END
             load = <0>;
             entry = <0>;
         };
+
 ITS_HEADER_END
 
-for i in ${!dtb_list[@]}; do
-	dtb=${dtb_list[${i}]}
+for dtb in ${dtb_list[@]}; do
 	cat <<-FDT_END
-	        fdt@$(expr ${i} + 1){
+	        $(basename ${dtb}) {
 	            description = "$(basename ${dtb})";
 	            data = /incbin/("${dtb}");
 	            type = "flat_dt";
 	            arch = "${arch}";
 	            compression = "${compression}";
-	            hash@1{
+	            hash {
 	                algo = "sha1";
 	            };
 	        };
@@ -41,20 +41,20 @@ done
 
 cat <<-ITS_MIDDLE_END
     };
+
     configurations {
-        default = "conf@1";
 ITS_MIDDLE_END
 
-for i in "${!dtb_list[@]}"; do
+for dtb in "${dtb_list[@]}"; do
 	compat_line=""
-	dtb_uncompressed=$(echo ${dtb_list[${i}]} | sed "s/\(\.dtb\).*/\1/g")
+	dtb_uncompressed=$(echo ${dtb} | sed "s/\(\.dtb\).*/\1/g")
 	for compat in $(fdtget "${dtb_uncompressed}" / compatible); do
 		compat_line+="\"${compat}\","
 	done
 	cat <<-ITS_CONF_END
-	        conf@$(expr ${i} + 1){
-	            kernel = "kernel@1";
-	            fdt = "fdt@$(expr ${i} + 1)";
+	        $(basename ${dtb} | sed "s/\(\.dtb\).*//g") {
+	            kernel = "kernel-archlinuxarm";
+	            fdt = "$(basename ${dtb})";
 	            compatible = ${compat_line%,};
 	        };
 	ITS_CONF_END
